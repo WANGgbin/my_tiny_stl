@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <algorithm>
 
-
+namespace my_tiny_stl{
 template<class T>
 T* allocate(ptrdiff_t n, T*){
 	T* ret;
@@ -53,5 +53,6 @@ public:
 	}
 };
 
+}//namespace my_tiny_stl
 
 #endif	//__DEFALLOC_H

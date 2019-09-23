@@ -27,6 +27,7 @@
  * 生成一个类。这也是一种模板编程技巧，请注意。
  * 
  */
+namespace my_tiny_stl{
 
 template<int inst>
 class __malloc_alloc_template{
@@ -292,4 +293,5 @@ void __default_alloc_template<inst>::deallocate(void* ptr, size_t n){
 	
 }
 
+}//namespace my_tiny_stl
 #endif //__MY_STL_ALLOC_H
