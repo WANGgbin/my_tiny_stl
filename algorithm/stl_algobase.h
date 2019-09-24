@@ -36,6 +36,149 @@ namespace my_tiny_stl{
  * 目的在于，告诉用户这个算法能接受的最低阶迭代器类型是InputIterator类型。这时STL的一个命名规则，这
  * 实际上是一个好的编程习惯，在模板编程中，参数的名称即可告诉用户，这个函数模板/类模板期待接受什么样的类型。
  */
+
+/**
+ * 再讨论一个问题，类模板包括泛化、偏特化、特化。函数模板包括泛化、特化。那么给定一个类模板生成的类以及一个
+ * 通过函数模板生成的函数，我们怎么知道是由哪个模式的类模板或者函数模板生成的呢？很简单，对于类，我们从类的
+ * 特化列表出发匹配即可。对于函数，从函数参数类型出发匹配即可。
+ *
+ * 上面所属似乎有点多余，模板匹配不就是这样吗，为什么还要单独拿出来强调？只有我们时时刻刻清楚这一点，才能写出
+ * 正确的类模板或者函数模板。
+ */
+
+/**
+ * **********************************copy start**************************************
+ */
+template<class T>
+T* ___copy(T* first,
+		   T* last,
+		   T* result,
+		   true_type){
+	memmove(result, first, sizeof(T) * (last - first));
+	return result + (last - first);
+}
+
+template<class T>
+T* ___copy(const T* first,
+		   const T* last,
+		   T* result,
+		   true_type){
+	memmove(result, first, sizeof(T) * (last - first));
+	return result + (last - first);
+}
+
+template<class T>
+T* ___copy(T* first,
+		   T* last,
+		   T* result,
+		   false_type){
+	
+	return ___copy(first, last, result);
+}
+
+template<class T>
+T* ___copy(const T* first,
+		   const T* last,
+		   T* result,
+		   false_type){
+	
+	return ___copy(first, last, result);
+}
+
+template<class RandomAccessIterator,
+		 class Outerator>
+Outerator* ___copy(RandomAccessIterator* first,
+				   RandomAccessIterator* last,
+				   Outerator* result){
+	for(int n = last - first; n > 0; --n, ++first, ++result){
+		*result = *first;
+	}
+
+	return result;
+}
+
+
+template<class Interator, class Outerator>
+Outerator __copy_inner(Interator first,
+					   Interator last,
+					   Outerator result,
+					   input_iterator_tag){
+
+	for(;first != last; ++first, ++result){
+		*result = *first;
+	}
+
+	return result;
+}
+
+template<class RandomAccessIterator, class Outerator>
+Outerator __copy_inner(RandomAccessIterator first,
+					   RandomAccessIterator last,
+					   Outerator result,
+					   random_access_iterator_tag){
+	return ___copy(first, last, result);
+}
+
+
+template<class Interator, class Outerator>
+class __copy{
+public:
+	static Outerator operator()(Interator first,
+						 Interator last,
+						 Outerator result){
+		return __copy_inner(first, last, result, 
+							iterator_traits<first>::iterator_category());
+	}
+};
+
+/**
+ * 一定要注意在模板编程中对类型const type与类型type的区别。这两者是不同的类型。在我们的copy例子中
+ * 需要对原生指针类型进行特化。指针可以分为T*和const T*，这两者的特化一样吗？
+ *
+ * 如果我们只有如下的一次特化，当我们调用__copy<const int*, int*>，因为特化列表中两个参数不同所
+ * 以就会进入到泛化的__copy中，这显然不是我们希望的，所以我们希望针对__copy<const T*, T*>再进行
+ * 一次偏特化。
+ */
+
+template<class T>
+class __copy<T*, T*>{
+public:
+	T* operator()(T* first,
+				  T* last,
+				  T* result){
+		return ___copy(first, last, result, type_traits<T>::has_trivial_assignment_operator());
+	}
+};
+
+template<class T>
+class __copy<const T*, T*>{
+public:
+	T* operator()(const T* first,
+				  const T* last,
+				  T* result){
+		return ___copy(first, last, result, type_traits<T>::has_trivial_assignment_operator());
+	}
+};
+
+template<class Interator, class Outerator>
+Outerator _copy(Interator first,
+				Interator last,
+				Outerator result){
+	return __copy<Interator, Outerator>()();
+}
+
+
+char* _copy(const char* first, const char* last, char* result){
+	memmove(result, first, last - first);
+	return result + (last - first);
+}
+
+wchar_t* _copy(const wchar_t* first, const wchar_t* last, wchar_t* result){
+	memmove(result, first, sizeof(wchar_t) * (last - first));
+	return result + (last - first);
+}
+
+
 template<class Interator, class Outerator>
 Outerator copy(Interator first,
 			   Interator last,
@@ -43,33 +186,145 @@ Outerator copy(Interator first,
 	return _copy(first, last, result);
 }
 
-template<class Interator, class Outerator>
-Outerator _copy(Interator first,
-				Interator last,
-				Outerator result){
+/**
+ * ********************************copy end************************************
+ */
 
+
+/**
+ * *******************************copy_backward start****************************
+ */
+template<class RandomAccessIterator1,
+		 class RandomAccessIterator2>
+RandomAccessIterator2 
+___copy_backward_called(RandomAccessIterator1 first,
+						RandomAccessIterator1 last,
+						RandomAccessIterator2 result){
+	ptrdiff_t num = last - first;
+
+	for(;num > 0; --num){
+		*--result = *--last;
+	}
+
+	return result - num;
 }
 
-template<>
-char* _copy<char*>(char* first, char* last, char* result){
-	memmove(result, first, last - first);
-	return result + (last - first);
+template <class T>
+T* ___copy_backward(T* first, T* last, T* result, true_type){
+	ptrdiff_t num = last - first;
+	memmove(result - num, first, sizeof(T) * num);
+
+	return result - num;
 }
 
-wchar_t* _copy(wchar_t* first, wchar_t* last, wchar_t* result){
-	memmove(result, first, sizeof(wchar_t) * (last - first));
-	return result + (last - first);
+template <class T>
+T* ___copy_backward(T* first, T* last, T* result, false_type){
+	return ___copy_backward_called(first, last, result);
 }
 
-template<class Interator, class Outerator>
-class __copy{
 
+template <class T>
+T* ___copy_backward(const T* first, const T* last, T* result, true_type){
+	ptrdiff_t num = last - first;
+	memmove(result - num, first, sizeof(T) * num);
+
+	return result - num;
+}
+
+template <class T>
+T* ___copy_backward(const T* first, const T* last, T* result, false_type){
+	return ___copy_backward_called(first, last, result);
+}
+
+template<class BidirectionalIterator1,
+		 class BidirectionalIterator2>
+BidirectionalIterator2
+___copy_backward(BidirectionalIterator1 first,
+				 BidirectionalIterator1 last,
+				 BidirectionalIterator2 result,
+				 bidirectional_iterator_tag){
+	for(;last != first;)
+		*--result = *--last;
+
+	return result;
+}
+
+template<class RandomAccessIterator1,
+		 class RandomAccessIterator2>
+RandomAccessIterator2
+___copy_backward(RandomAccessIterator1 first,
+				 RandomAccessIterator1 last,
+				 RandomAccessIterator2 result,
+				 random_access_iterator_tag){
+	return ___copy_backward_called(first, last, result);
+}
+
+template<class BidirectionalIterator1,
+		 class BidirectionalIterator2>
+class __copy_backward{
+public:
+	BidirectionalIterator2 operator()(BidirectionalIterator1 first,
+									  BidirectionalIterator1 last,
+									  BidirectionalIterator2 result){
+		return ___copy_backward(first, last, result,
+								iterator_traits<first>::iterator_category());
+	}
 };
 
 template<class T>
-class __copy<T*, T*>{
-	
+class __copy_backward<T*, T*>{
+public:
+	T* operator()(T* first, T* last, T* result){
+		return ___copy_backward(first, last, result,
+								type_traits<T>::has_trivial_default_constructor());
+	}
 };
 
+template<class T>
+class __copy_backward<const T*, T*>{
+public:
+	T* operator()(const T* first, const T* last, T* result){
+		return ___copy_backward(first, last, result,
+								type_traits<T>::has_trivial_default_constructor());
+	}
+};
+
+template<class BidirectionalIterator1,
+		 class BidirectionalIterator2>
+BidirectionalIterator2 _copy_backward(BidirectionalIterator1 first,
+									  BidirectionalIterator1 last,
+									  BidirectionalIterator2 result){
+	return __copy_backward<BidirectionalIterator1,
+						   BidirectionalIterator2>()();
+}
+
+char* _copy_backward(const char* first,
+					 const char* last,
+					 char* result){
+	ptrdiff_t num = last - first;
+	memmove(result - num, first, last);
+	return  result - num;
+}
+
+wchar_t* _copy_backward(const wchar_t* first,
+						const wchar_t* last,
+						char* result){
+	ptrdiff_t num = last - first;
+	memmove(result - num, first, sizeof(wchar_t) * num);
+
+	return result - num;
+}
+
+template<class BidirectionalIterator1,
+		class BidirectionalIterator2>
+BidirectionalIterator2 copy_backward(BidirectionalIterator1 first,
+									 BidirectionalIterator1 last,
+									 BidirectionalIterator2 result){
+	return _copy_backward(first, last, result);
+}
+
+/**
+ * *****************************copy_backward end*********************************
+ */
 }//namespace my_tiny_stl  
 #endif //__STL_ALGOBASE_h
