@@ -53,7 +53,7 @@ class random_access_iterator_tag : public bidirectional_iterator_tag{};
 
 
 template<class T>
-class iterator_traits{
+class iterator_traits{    
 public:
 	typedef typename T::value_type 			value_type;
 	typedef typename T::pointer 			pointer;
@@ -123,19 +123,25 @@ public:
 
 template<class Iterator>
 typename iterator_traits<Iterator>::iterator_category
-iterator_category(const Iterator& obj){
+iterator_category(const Iterator& ){
 	return iterator_traits<Iterator>::iterator_category();
 }
 
+/**
+ * 我们考虑一个问题这里distance_type和value_type为什么要返回一个指针，为什么不返回一个对象呢？
+ * 因为我们不知道Iterator对应的difference_type以及value_type是什么类型的对象。如果是个复杂的
+ * 对象的话，函数返回的时候效率就比较低，所以我们直接返回指针。那么为什么iterator_category函数是
+ * 返回对象呢？别忘了那些iterator_category对象都是空类~~
+ */
 template<class Iterator>
 typename iterator_traits<Iterator>::difference_type*
-distance_type(const Iterator& obj){
+distance_type(const Iterator&){
 	return static_cast<iterator_category<Iterator>::difference_type*>(0);
 }
 
 template<class Iterator>
 typename iterator_traits<Iterator>::value_type*
-value_type(const Iterator& obj){
+value_type(const Iterator&){
 	return static_cast<iterator_category<Iterator>::value_type*>(0);
 }
 

@@ -6,6 +6,10 @@
 #define __STL_ALGOBASE_H
 
 #include <string.h>
+#include <stdlib.h>
+#include <limits.h>
+#include <stddef.h>
+#include <new.h>
 
 #include "../iterator/stl_iterator.h"
 #include "../iterator/type_traits.h"
@@ -168,12 +172,12 @@ Outerator _copy(Interator first,
 }
 
 
-char* _copy(const char* first, const char* last, char* result){
+inline char* _copy(const char* first, const char* last, char* result){
 	memmove(result, first, last - first);
 	return result + (last - first);
 }
 
-wchar_t* _copy(const wchar_t* first, const wchar_t* last, wchar_t* result){
+inline wchar_t* _copy(const wchar_t* first, const wchar_t* last, wchar_t* result){
 	memmove(result, first, sizeof(wchar_t) * (last - first));
 	return result + (last - first);
 }
@@ -298,7 +302,7 @@ BidirectionalIterator2 _copy_backward(BidirectionalIterator1 first,
 						   BidirectionalIterator2>()();
 }
 
-char* _copy_backward(const char* first,
+inline char* _copy_backward(const char* first,
 					 const char* last,
 					 char* result){
 	ptrdiff_t num = last - first;
@@ -306,7 +310,7 @@ char* _copy_backward(const char* first,
 	return  result - num;
 }
 
-wchar_t* _copy_backward(const wchar_t* first,
+inline wchar_t* _copy_backward(const wchar_t* first,
 						const wchar_t* last,
 						char* result){
 	ptrdiff_t num = last - first;
@@ -326,5 +330,22 @@ BidirectionalIterator2 copy_backward(BidirectionalIterator1 first,
 /**
  * *****************************copy_backward end*********************************
  */
+
+
+template<typename ForwardIterator, typename T>
+ForwardIterator fill_n(ForwardIterator first, size_t n, const T& x){
+	for(;n > 0; ++first, --n)
+		*first = x;
+
+	return first;
+}
+
+template<typename ForwardIterator, typename T>
+void fill(ForwardIterator first, ForwardIterator last, const T& x){
+	for(;first != last; ++first)
+		*first = x;
+}
+
+
 }//namespace my_tiny_stl  
 #endif //__STL_ALGOBASE_h

@@ -18,6 +18,7 @@ class false_type{};
  */
 template<class T>
 class type_traits{
+public:
 	typedef false_type has_trivial_default_constructor;
 	typedef false_type has_trivial_copy_constructor;
 	typedef false_type has_trivial_assignment_operator;
@@ -31,7 +32,129 @@ class type_traits{
  */
 
 tempalte<>
+class type_traits<char>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<>
+class type_traits<unsigned char>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<>
+class type_traits<signed char>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<>
+class type_traits<short>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<>
+class type_traits<unsigned short>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<>
 class type_traits<int>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<>
+class type_traits<unsigned int>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<>
+class type_traits<long int>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<>
+class type_traits<unsigned long int>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<>
+class type_traits<float>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+
+tempalte<>
+class type_traits<double>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<>
+class type_traits<long double>{
+public:
+	typedef true_type has_trivial_default_constructor;
+	typedef true_type has_trivial_copy_constructor;
+	typedef true_type has_trivial_assignment_operator;
+	typedef true_type has_trivial_destructor;
+	typedef true_type is_POD_type;
+};
+
+tempalte<class T>
+class type_traits<T*>{
+public:
 	typedef true_type has_trivial_default_constructor;
 	typedef true_type has_trivial_copy_constructor;
 	typedef true_type has_trivial_assignment_operator;
