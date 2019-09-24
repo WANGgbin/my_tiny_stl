@@ -145,5 +145,32 @@ value_type(const Iterator&){
 	return static_cast<iterator_category<Iterator>::value_type*>(0);
 }
 
+
+/**
+ * implemention of distance().
+ */
+
+template<class Interator>
+typename iterator_traits<Interator>::difference_type
+_distance(Interator first, Interator last, input_iterator_tag){
+	typename iterator_traits<Interator>::difference_type n = 0;
+	for(;first != last; ++first, ++n);
+	return n;
+}
+
+template<class RandomAccessIterator>
+typename iterator_traits<RandomAccessIterator>::difference_type
+_distance(RandomAccessIterator first, RandomAccessIterator last, random_access_iterator_tag){
+	return last - first;
+}
+
+template<class Interator>
+typename iterator_traits<Interator>::difference_type
+distance(Interator first, Interator last){
+	typedef typename iterator_traits<Interator>::iterator_category category;
+	return _distance(first, last, category());
+}
+
+	
 }//my_tiny_stl
 #endif //__STL_ITERATOR_H

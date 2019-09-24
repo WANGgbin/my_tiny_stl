@@ -293,5 +293,28 @@ void __default_alloc_template<inst>::deallocate(void* ptr, size_t n){
 	
 }
 
+typedef __default_alloc_template<0> alloc;
+
+
+template<class T, class Alloc = alloc>
+class simple_alloc{
+public:
+	static T* allocate(size_t n){
+				return (T*)Alloc::allocate(sizeof(T) * n);
+			}
+
+	static T* allocate(){
+			return (T*)Alloc::allocate(sizeof(T));
+		}
+
+	static void deallocate(T* ptr, size_t n){
+		Alloc::deallocate(ptr, sizeof(T) * n);
+	}
+
+	static void deallocate(T* ptr){
+		Alloc::deallocate(ptr, sizeof(T));
+	}
+};
+
 }//namespace my_tiny_stl
 #endif //__MY_STL_ALLOC_H

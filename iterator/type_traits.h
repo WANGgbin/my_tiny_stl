@@ -162,7 +162,6 @@ public:
 	typedef true_type is_POD_type;
 };
 
-
 }//my_tiny_stl
 
 #endif//__TYPE_TRAITS_H

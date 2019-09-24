@@ -13,7 +13,7 @@ ForwardIterator _uninitialized_copy(Interator first,
 									Interator last,
 									ForwardIterator result,
 									true_type){
-	copy(first, last, result);
+	return copy(first, last, result);
 }
 
 template<class Interator, class ForwardIterator>
@@ -21,8 +21,16 @@ ForwardIterator _uninitialized_copy(Interator first,
 									Interator last,
 									ForwardIterator result,
 									false_type){
-	for(;first != last; ++first, ++result)
-		construct(&*result, *first);
+	try{
+		ForwardIterator cur = result;
+		for(;first != last; ++first, ++cur)
+			construct(&*cur, *first);
+		return cur;
+	}
+	catch(...){
+		destroy(result, cur);
+		throw;
+	}
 }
 
 
@@ -70,6 +78,7 @@ void _uninitialized_fill(ForwardIterator first,
 	}
 	catch(...){
 		destroy(first, cur);
+		throw;
 	}
 }
 
@@ -108,6 +117,7 @@ ForwardIterator _uninitialized_fill_n(ForwardIterator first,
 	}
 	catch(...){
 		destroy(first, cur);
+		throw;
 	}
 }
 
