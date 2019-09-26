@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 
+
 namespace my_tiny_stl{
 
 template<class T, class Alloc = alloc>
@@ -36,17 +37,23 @@ private:
 	void insert_aux(iterator pos, const T& x);
 public:
 	vector(){start = 0; finish = 0; end_of_storage = 0;}
+
 	vector(size_t n, const T& x){fill_initialize(n, x);}
+
 	vector(int n, const T& x){fill_initialize(n, x);}
+
 	vector(long int n, const T& x){fill_initialize(n, x);}
+
 	explicit vector(size_t n){fill_initialize(n, T());}
 
 	template<class Interator>
 	vector(Interator first, Interator last){
+
 		difference_type n = distance(first, last);
 		start = data_allocator::allocate(n);
 		finish = uninitialized_copy(first, last, start);
 		end_of_storage = finish;		
+
 	}
 
 	~vector(){
@@ -54,8 +61,41 @@ public:
 		data_allocator::deallocate(start, end_of_storage - start);
 	}
 
+	iterator begin(){return start;}
+	
+	iterator end(){return finish;}
+
+	difference_type size(){return finish - start;}
+
+	difference_type capacity(){return end_of_storage - start;}
+
+	bool empty(){return start == finish;}
+
+	reference operator[](size_t n){return *(start + n);}
+
+	reference front(){return *start;}
+
+	/**
+	 * 这里一定要注意，finish的指向。所以函数返回应该是*(finish - 1)，而不是*(finish)。
+	 */
+	reference back(){return *(finish - 1);}
+
+	void push_back(const T& obj){
+		insert_aux(finish, obj);
+	}
+
+	/**
+	 * 注意pop_back的工作是将尾端的元素去除，并不返回给元素。
+	 */
+	void pop_back(){
+		--finish;
+		destroy(finish);
+	}
+
 	void insert(iterator pos, size_t n);
+	
 	iterator erase(iterator pos);
+	
 	iterator erase(iterator first, iterator last);
 };
 
@@ -177,6 +217,7 @@ iterator vector<T, Alloc>::erase(iterator first, iterator last){
 	finsih -= (last - first);
 	return first;
 }
+
 
 }
 #endif//__STL_VECTOR_H
