@@ -14,6 +14,7 @@ public:
 	typedef T& reference;
 	typedef ptrdiff_t difference_type;
 	typedef simple_alloc<T, Alloc> data_allocator;
+	typedef vector<T, Alloc> self;
 
 private:
 	iterator start;
@@ -92,13 +93,21 @@ public:
 		destroy(finish);
 	}
 
-	void insert(iterator pos, size_t n);
+	void insert(iterator pos, size_t n, const T& x);
 	
 	iterator erase(iterator pos);
 	
 	iterator erase(iterator first, iterator last);
+
+	void resize(size_t new_size, const T& x);
+
+	void operator=(const self& x);
+
 };
 
+/**
+ * 在pos前插入元素x.
+ */
 template<class T, class Alloc>
 void vector<T, Alloc>::insert_aux(iterator pos, const T& x){
 	difference_type n = end_of_storage - finish;
@@ -145,9 +154,11 @@ void vector<T, Alloc>::insert_aux(iterator pos, const T& x){
 
 }
 
-
+/**
+ * 同样是前插操作，在pos前面插入n个值为x的元素。
+ */
 template<class T, class Alloc>
-void vector<T, Alloc>::insert(iterator pos, size_t n){
+void vector<T, Alloc>::insert(iterator pos, size_t n, const T& x){
 	difference_type left;
 	iterator new_finish;
 
@@ -218,6 +229,50 @@ iterator vector<T, Alloc>::erase(iterator first, iterator last){
 	return first;
 }
 
+template<class T, class Alloc>
+void vector<T, Alloc>::resize(size_t new_size, const T& x){
+	size_t old_size = size();
+	if(old_size > new_size)
+		erase(finish - (new_size - old_size), finish);
+	else
+		insert(finish, new_size - old_size, x);
+}
+
+template<class T, class Alloc>
+self& vector<T, Alloc>::operator=(const self& x){
+	if(x != *this){
+		size_t size = size();
+		size_t x_size = x.size();
+		size_t capacity = capacity();
+
+		if(capacity < x_size){
+			destroy(start, finish);
+			data_allocator::deallocate(start, capacity);
+
+			start = data_allocator::allocate(x_size);
+			finish = uninitialized_copy(x.begin(), x.end(), new_start);
+			end_of_storage = start + x_size; 
+		}
+		else if(size < x_size){
+			copy(x.begin(), x.begin() + size, start);
+			finish = uninitialized_copy(x.begin() + size, x.end(), finish);
+		}
+		else{
+			copy(x.begin(), x.end(), start);
+			erase(start + x_size, finish);
+			finish = start + x_size;
+		}
+	}
+
+	return *this;
+}
+
+template<class T, class Alloc>
+bool operator==(const vector<T, Alloc>& obj1,
+			    const vector<T, Alloc>& obj2){
+	return obj1.size() == obj2.size() &&
+		   equal(obj1.begin(), obj1.end(), obj2.begin());
+}
 
 }
 #endif//__STL_VECTOR_H

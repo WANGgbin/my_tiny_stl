@@ -346,6 +346,28 @@ void fill(ForwardIterator first, ForwardIterator last, const T& x){
 		*first = x;
 }
 
+/**
+ * 这里一定要注意equal只是比较[first1, last1)与[first2, first2 + last1 - first1)之间的元素
+ * 是否相同，并不关心first2 + last1 - first1 是不是比last2大即不关心第二序列的元素是不是比第一
+ * 序列少。当第二序列的元素较少时，将产生不可预料的结果。所以，在使用这个函数前，程序员必须要保证正确性。
+ */
+template<class Interator1, class Interator2>
+bool equal(Interator1 first1, Interator1 last1, Interator2 first2){
+	for(;first1 != last1; ++first1, ++first2)
+		if(*first1 != *first2)
+			return false;
+		return true;
+}
+
+template<class Interator1, class Interator2, class BinaryPredicate>
+bool equal(Interator1 first1, Interator1 last1, Interator2 first2,
+		   BinaryPredicate binary_pred){
+	for(;first1 != last1; ++first1, ++first2)
+		if(!pred(*first1, *first2))
+			return false;
+		return true;
+}
+
 
 }//namespace my_tiny_stl  
 #endif //__STL_ALGOBASE_h

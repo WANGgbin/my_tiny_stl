@@ -90,7 +90,9 @@ public:
 	typedef list_node<T>	list_node_t;
 	typedef list_node_t* link_type;
 	typedef list_iterator<T> iterator;
+	typedef const list_iterator<T> const_iterator;
 	typedef simple_alloc<list_node_t> data_allocator;
+	typedef size_t size_type;
 
 private:
 	link_type node;
@@ -114,11 +116,23 @@ public:
 		insert(end(), first, last);
 	}
 
-	~list(){}
+	/**
+	 * 这里我们需要注意以下析构函数。析构函数中是通过调用clear函数来释放内存资源的。但是要注意的地方
+	 * 在于clear并不会释放node指向的节点，所以在析构函数中除了调用clear，我们还需要释放node指向的
+	 * 节点，这一点一定要注意，否则会造成内存泄漏。
+	 */
+	~list(){
+		clear();
+		put_node(node);
+	}
+
 	iterator begin(){return (link_type)(node->next);}
 	iterator end(){return node;}
 	bool empty(){return begin() == end();}
-
+	size_type size(){
+		return distance(begin(), end());
+	}
+	size_type max_size(){return size_type(-1);}
 
 private:
 
@@ -215,15 +229,13 @@ public:
 		erase(begin());
 	}
 
-	void swap(self& x){
-		link_type tmp = node;
-		node = x.
-	}
+	
 
 	void remove(const T& x);
-
 	void clear();
 	self& operator=(const self& x);
+	void unique();
+	void resize(size_t new_size, const T& x);
 	/**
 	 * SGI STL提供了多个版本的splice(拼接)操作。
 	 */
@@ -290,13 +302,18 @@ void list<T, Alloc>::remove(const T& x){
 	for(;first != last;){
 		if(*first == x)
 			erase(first++);
+		else
+			++first;
 	}
 	
 }
 
 /**
- * 注意列表的赋值操作后面的思想，将x的元素一一赋值给this的链表，如果x的长度长的话，将x剩余的
- * 插入到this中去，如果this长，将多余的部分erase。
+ * 注意列表的赋值操作后面的思想。我们想当然的想法是将this链表先clear，然后再将x的所有元素
+ * 插入到this中，但是STL中的思想是将x的元素一一赋值给this的链表，如果x的长度长的话，将x剩
+ * 余的插入到this中去，如果this长，将多余的部分erase。这样相比我们的做法效率会高，我们的
+ * 做法中会有节点的释放、节点的分配，而在SGT STL的实现中，抛开最后的erase或者insert不讲，
+ * 中间的循环处理部分只有节点对应数据成员的赋值。
  */
 template<class T, class Alloc>
 self& list<T, Alloc>::operator=(const self& x){
@@ -309,7 +326,7 @@ self& list<T, Alloc>::operator=(const self& x){
 		*first1++ = *first2++;
 	}
 
-	if(first2 = last2)
+	if(first2 == last2)
 		erase(first1, last1);
 	else
 		insert(last1, first2, last2);
@@ -317,6 +334,46 @@ self& list<T, Alloc>::operator=(const self& x){
 	return *this;
 }
 
+/**
+ * 注意这个函数并不是说让双链表中所有的元素都唯一，只是让连续且相同的元素保持唯一性。所以要让链表
+ * 中的元素保持唯一的话，我们可以先对链表进行一次排序，然后调用unique函数。
+ */
+template<class T, class Alloc>
+void list<T, Alloc>::unique(){
+	iterator first = begin();
+	iterator last = end();
+	iterator next = first;
+
+	while(++next != last){
+		if(*first == *next)
+			erase(next);
+		else
+			first = next;
+
+		next = first;
+	}
+}
+
+/**
+ * 这个函数的功能是用来调整链表长度的，当当前链表的长度小于参数指定的长度的时候，则需要插入新的元素，当
+ * 当前链表的长度大于参数指定的长度的时候，则需要删除多余的节点。
+ */
+
+template<class T, class Alloc>
+void list<T, Alloc>::resize(size_t new_size, const T& x){
+	iterator first = begin();
+	iterator last = end();
+	size_t len = 0;
+
+	for(;first != last && len < new_size; ++first, ++len)
+		;//注意这时一个良好的编程习惯，我们之所以把分号写在这儿，就是为了突出显示这个for循环什么都不做。
+
+	if(first == last)
+		insert(last, new_size - len, x);
+	else
+		erase(first, last);
+
+}
 /**
  * 这个函数要注意一个地方，pos不能位于first到last之间。这个函数可以作用于同一条双链表上，也可以作用于不同的双链表上。
  * 这个函数涉及到6个指针的变化，只需要注意指针变化的顺序即可。
@@ -386,6 +443,27 @@ void list<T, Alloc>::reverse(){
 
 template<class T, class Alloc>
 void list<T, Alloc>::sort(){
+
+}
+
+template<class T, class Alloc>
+bool operator==(const list<T, Alloc>& obj1,
+				const list<T, Alloc>& obj2){
+	typedef typename list<T, Alloc>::const_iterator const_iterator;
+
+	const_iterator first1  = obj1.begin();
+	const_iterator last1 = obj1.end();
+	const_iterator first2 = obj2.begin();
+	const_iterator last2 = obj2.end();
+
+	for(;first1 != last1 &&
+		 first2 != last2 &&
+		 *first1 == *first2){
+		++first1;
+		++first2;
+	}
+
+	return first1 == last1 && first2 == last2;
 
 }
 
