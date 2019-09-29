@@ -443,7 +443,7 @@ void list<T, Alloc>::reverse(){
 
 template<class T, class Alloc>
 void list<T, Alloc>::sort(){
-
+	//todo
 }
 
 template<class T, class Alloc>
