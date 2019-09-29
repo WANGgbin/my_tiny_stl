@@ -133,7 +133,7 @@ struct dequeue_iterator{
 	}
 };
 
-template<class T, class Alloc = alloc, size_t BufSize>
+template<class T, class Alloc = alloc, size_t BufSize = 0>
 class dequeue{
 public:
 	typedef T 										value_type;
@@ -233,6 +233,10 @@ public:
 	iterator erase(iterator pos);
 	iterator erase(iterator first, iterator last);
 
+	dequeue(){
+		create_map_and_nodes(0);
+	}
+	
 	dequeue(size_t n, const T& x){
 		fill_initialize(n, x):
 	}
