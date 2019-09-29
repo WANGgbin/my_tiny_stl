@@ -190,6 +190,9 @@ private:
 
 	void fill_initialize(size_type n, const T& x);
 
+	template<class Interator>
+	void copy_initialize(Interator first, Interator last);
+
 	void reallocate_map(size_type nodes_to_add, bool add_at_front);
 
 	void reserve_map_at_back(size_type nodes_to_add = 1){
@@ -224,12 +227,29 @@ public:
 	void clear();
 
 	iterator insert(iterator pos, const T& x);
+	template<class Interator>
+	void insert(iterator pos, Interator first, Interator last);
 
 	iterator erase(iterator pos);
 	iterator erase(iterator first, iterator last);
 
+	dequeue(size_t n, const T& x){
+		fill_initialize(n, x):
+	}
 
+	explicit dequeue(size_t n){
+		fill_initialize(n, T());
+	}
 
+	dequeue(const self& x){
+		create_map_and_nodes(x.size());
+		uninitialized_copy(x.begin(), x.end(), start);
+	}
+
+	template<class Interator>
+	dequeue(Interator first, Interator last){
+		copy_initialize(first, last);
+	}
 /**
  * 两个dequeue相等的标准是只要元素相等即可，并不要求对象成员相等！
  */
@@ -315,12 +335,40 @@ void dequeue<T, Alloc, BufSize>::create_map_and_nodes(size_type n){
 template<class T, class Alloc, size_t BufSize>
 void dequeue<T, Alloc, BufSize>::fill_initialize(size_type n, const T& x){
 	create_map_and_nodes(n);
-	map_pointer cur = start;
-	for(;start < finish; ++start)
-		uninitialized_fill(*cur, *cur + buffer_size(), x);
-	uninitialized_fill(*finish, finish.cur, x);
+	map_pointer cur = start.node;
+	try{
+		for(;cur < finish.node; ++cur)
+			uninitialized_fill(*cur, *cur + buffer_size(), x);
+		uninitialized_fill(finish.last, finish.cur, x);
+	}
+	catch(...){
+		destroy_nodes(start.node , finish.node + 1);
+		throw;
+	}
 }
 
+template<class T, class Alloc, size_t BufSize>
+template<class Interator>
+void dequeue<T, Alloc, BufSize>::copy_initialize(Interator first, Interator last){
+	size_t distance = distance(first, last);
+	create_map_and_nodes(distance);
+	map_pointer cur = start.node;
+	Interator tmp = first;;
+	try{	
+		for(;cur < finish.node; ++cur){
+			advance(tmp, buffer_size());
+			uninitialized_copy(first , tmp, *cur);
+			//注意这里的迭代器类型是Interator，所以不能+=!!!
+			// first += tmp;
+			// tmp += buffer_size();
+			first = tmp;
+		}
+	}
+	catch(...){
+		destroy_nodes(start.node, finish.node);
+		throw;
+	}
+}
 /**
  * 该函数用来调整map，注意只是加入新的节点并不会为这些节点分配相应的缓冲区。
  */   
@@ -506,6 +554,87 @@ iterator dequeue<T, Alloc, BufSize>::insert_aux(iterator pos, const T& x){
 }
 
 template<class T, class Alloc, class BufSize>
+template<class Interator>
+void dequeue<T, Alloc, BufSize>::iterator(iterator pos, Interator first, Interator last){
+	size_t add_elements = last - first;
+	size_t elements_after_pos;
+	size_t elements_before_pos
+	size_t add_nodes;
+	size_t mod_elements;
+	iterator new_finish, new_start;
+
+	if( (pos - start) > (finish - pos)){
+		if(add_elements >= (finish.last - finish.cur)){
+			add_nodes = (add_elements - (finish.last - finish.cur)) / buffer_size() + 1;
+			mod_elements = (add_elements - (finish.last - finish.cur)) % buffer_size();
+			reserve_map_at_back(add_nodes);
+			try{
+				for(map_pointer cur = finish.node + 1, size_t i = 0; i < add_nodes; ++cur, ++i)
+					*cur = data_allocate();
+			}
+			catch(...){
+				destroy_nodes(finish.node + 1, cur);
+				throw;
+			}			
+		}
+		try{
+			elements_after_pos = finish - pos;
+			if(add_elements < elements_after_pos){
+				new_finish = uninitialized_copy(finish - add_elements, finish, finish);
+				copy_backward(pos, finish - add_elements, finish);
+				copy(first, last, pos);
+			}
+			else{
+				new_finish = uninitialized_copy(last - (add_elements - elements_after_pos), last, finish);
+				new_finish = uninitialized_copy(pos, finish, new_finish);
+				copy(first, last, pos);
+			}
+		}
+		catch(...){
+			destroy_nodes(finish.node + 1, finish.node + 1 + add_nodes);
+			throw;
+		}
+		finish = new_finish;
+
+	}
+	else{
+		if(add_elements > (start.cur - start.first)){
+			add_nodes = (add_elements - (start.cur - start.first)) / buffer_size() + 1;
+			mod_elements = (add_elements - (start.cur - start.first)) % buffer_size();
+			reserve_map_at_front(add_nodes);
+			try{
+				for(map_pointer cur = start.node - 1, size_t i = 0; i < add_nodes; --cur, ++i)
+					*cur = data_allocate();
+			}
+			catch(...){
+				destroy_nodes(cur + 1, start.node - 1);
+				throw;
+			}			
+		}
+		elements_before_pos = pos - start;
+		new_start = start - add_elements;
+		try{
+			if(add_elements < elements_before_pos){
+				uninitialized_copy(first, last, new_start);
+				copy(start + add_elements, pos, start);
+				copy_backward(first, last, pos);
+			}
+			else{
+				iterator tmp = uninitialized_copy(start, pos, new_start);	
+				uninitialized_copy(first, first + add_elements - elements_before_pos, tmp);
+				copy(first + add_elements - elements_before_pos, last, start );
+			}
+		}
+		catch(...){
+			destory(start.node - add_nodes, start.node);
+			throw;
+		}
+		start = new_start;
+	}
+}
+
+
+template<class T, class Alloc, class BufSize>
 iterator dequeue<T, Alloc, BufSize>::erase(iterator pos){
 	size_t distance_from_start = pos - start;
 
@@ -556,5 +685,6 @@ bool operator==(const dequeue<T, Alloc, BufSize>& x,
 }
 
 
-}
+}//namespace my_tiny_stl
+
 #endif//__STL_DEQUEUE_H

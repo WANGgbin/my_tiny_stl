@@ -171,6 +171,28 @@ distance(Interator first, Interator last){
 	return _distance(first, last, category());
 }
 
-	
+template<class Interator, class Distance>
+void _advance(Interator& i, Distance n, input_iterator_tag){
+	for(;n > 0; ++i, --n);
+}
+
+template<class Interator, class Distance>
+void _advance(Interator& i, Distance n, bidirectional_iterator_tag){
+	if(n >= 0)
+		while(n--) ++i;
+	else
+		while(n++) --i;
+}
+
+template<class Interator, class Distance>
+void _advance(Interator& i, Distance n, random_access_iterator_tag){
+	i += n;
+}
+
+template<class Interator, class Distance>
+void advance(Interator & i, Distance n){
+	_advance(i, n, iterator_traits<Interator>::iterator_category());
+}	
+
 }//my_tiny_stl
 #endif //__STL_ITERATOR_H
