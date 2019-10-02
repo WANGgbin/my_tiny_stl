@@ -7,6 +7,16 @@ typedef bool color_type;
 const color_type red = true;
 const color_typpe black = false;
 
+
+template<class T1, class T2>
+struct pair{
+	T1 first;
+	T2 second;
+
+	pair(){}
+	pair(const T1& obj1, const T2& obj2) : first(obj1), second(obj2){}
+};
+
 /**
  * ******************************节点部分*******************************************
  */
@@ -134,7 +144,7 @@ struct rb_tree_iterator : public rb_tree_base_iterator{
 	typedef rb_tree_node* link_type;
 
 	rb_tree_iterator(){}
-	rb_tree_iterator(link_type par) : rb_tree_base_iterator(par){}
+	explicit rb_tree_iterator(link_type par) : rb_tree_base_iterator(par){}
 
 
 	self& operator++(){
@@ -175,9 +185,17 @@ public:
 	typedef rb_tree_node* link_type;
 	typedef simple_alloc<rb_tree_node> node_allocator;
 	typedef size_t size_type;
+	typedef rb_tree_iterator<Value>	iterator;
+	typedef rb_tree_base_node::base_ptr base_ptr;
+
 private:
 	size_type node_count;
 	Comp comp;
+
+	/**
+	 * 为什么要引入header呢？在树的各种操作中，最需要注意的就是边界情况的发生，通常就是当走到根节点
+	 * 的时候需要特殊的处理。SGI STL为了尽量消除根节点的特殊性，为根节点提供了一个父节点即header.
+	 */
 	link_type header;
 
 private:
@@ -209,7 +227,254 @@ private:
 		put_node(ptr);
 	}
 
+	link_type& root() const {return (link_type&)/*这里类型转化只能是link_type&而不能是link_type*/(header->parent);}
+	link_type& leftmost() const {return (link_type&)(header->left);}
+	link_type& rightmost() const {return (link_type&)(header->right);}
+
+	static link_type& parent(link_type x){return (link_type&)(x->parent);}
+	static link_type& left(link_type x){return (link_type&)(x->left);}
+	static link_type& right(link_type x){return (link_type&)(x->right);}
+	static Value&	value(link_type x){return (x->data);}
+	//这里注意key函数的返回类型，因为我们是不希望改变key值的，所以返回类型是const的，至于
+	//函数为什么返回引用类型，因为这里的key并不是产生的局部对象，而是value的部分内容。
+	static const Key& key(link_type x){return KeyOfValue()(value(x));}
+	static color_type& color(link_type x){return x->color;}
+
+	static link_type& parent(base_ptr x){return (link_type&)(x->parent);}
+	static link_type& left(base_ptr x){return (link_type&)(x->left);}
+	static link_type& right(base_ptr x){return (link_type&)(x->right);}
+	static Value&	value(base_ptr x){return (((link_type)x)->data);}
+	//这里注意key函数的返回类型，因为我们是不希望改变key值的，所以返回类型是const的，至于
+	//函数为什么返回引用类型，因为这里的key并不是产生的局部对象，而是value的部分内容。
+	static const Key& key(base_ptr x){return KeyOfValue()(value(x));}
+	static color_type& color(base_ptr x){return ((link_type)x)->color;}	
+
+	static link_type minimum(link_type x){
+		return (link_type)(rb_tree_base_node::minimum(x));
+	}
+
+	static link_type maxmum(link_type x){
+		return (link_type)(rb_tree_base_node::maxmum(x));
+	}
+
+	void init(){
+		header = get_node();
+		color(header) = red;
+		root() = 0;
+		leftmost() = header;
+		rightmost() = header;
+	}
+
+private:
+	/**
+	 * 这部分重点介绍rb-tree的插入操作.
+	 */
+	
+	/**
+	 * [rb_tree_rotate_left 该函数是红黑树的左旋转操作，整个操作中涉及到3对6个指针的变化，注意指针的变化
+	 * 顺序即可，我们把x与y之间的互相指向放到最后，其他两对指针的变化顺序任意，为什么呢？因为x与y的指向会
+	 * 改变x->parent与y->left的值，而其他两对指针的变化会引用x->parent与y-left。]
+	 * @param x    [x是旋转点]
+	 * @param root [root是header->parent，因为这里可能会改变header->parent的值，所以传递的是引用]
+	 */
+	void rb_tree_rotate_left(base_ptr x, base_ptr& root){
+		base_ptr y = x->right;
+
+		x->right = y->left;
+
+		if(y->left)
+			y->left->parent = x;
+
+		y->parent = x->parent;
+
+		if(root == x)
+			root = y;
+		else if(x->parent->left == x)
+			x->parent->left = y;
+		else
+			x->parent->right = y;
+
+		x->parent = y;
+		y->left = x;
+	}
+
+	/**
+	 * [rb_tree_rotate_right 该函数是红黑树的左旋转操作，整个操作中涉及到3对6个指针的变化，注意指针的变化
+	 * 顺序即可，我们把x与y之间的互相指向放到最后，其他两对指针的变化顺序任意]
+	 * @param x    [x是旋转点]
+	 * @param root [root是header->parent，因为这里可能会改变header->parent的值，所以传递的是引用]
+	 */
+	void rb_tree_rotate_right(base_ptr x, base_ptr& root){
+		base_ptr y = x->left;
+
+		x->left = y->right;
+
+		if(y->right)
+			y->right->parent = x;
+
+		y->parent = x->parent;
+
+		if(root == x)
+			root = y;
+		else if(x->parent->left == x)
+			x->parent->left = y;
+		else
+			x->parent->right = y;
+
+		x->parent = y;
+		y->right = x;
+	}
+
+/**
+ * 那么什么时候，我们需要调整红黑树呢？
+当插入的节点不是根节点且其父节点为红节点的时候。如果插入节点是根节点只需要修改节点颜色即可。
+我们分三种情况讨论：
+1、当父节点的兄弟节点是红节点的时候，这个时候，我们需要将父节点与伯父节点的颜色调整为黑色，同时将祖父节点的颜色调整为红色，然后从祖父节点的角度出发，继续判断是否调整红黑树。这里为什么还需要继续向上调整呢？
+因为原来祖父节点是黑色的，所以祖父节点的父节点的颜色我们是不能确定的，现在我们将祖父节点调整为红色，由红黑树的特性我们知道，红节点的父节点必须是黑节点。所以，这个时候我们需要继续调整。
+
+2、当伯父节点不存在或者是黑色的时候，我们又需要分两种情况讨论：
+（1）、当插入节点是父节点的右节点的时候（前提：父节点是祖父节点的左孩子），我们先需要以父节点为旋转点左旋一次，然后修改插入节点颜色为黑色，祖父节点颜色为红色同时以祖父节点为旋转点右旋一次。
+（2）、当插入点是父节点的左节点的时候，我们需要修改父节点颜色为黑色，祖父节点颜色为红色同时以祖父节点为旋转点右旋一次。
+
+以上三种情况是以，父节点是祖父节点的左孩子举例的，当父节点是祖父节点的右节点的时候，是同样的道理。
+
+调整红黑数的伪代码为：
+
+while(需要调整){
+	if(父节点是祖父节点的左孩子){
+		if(伯父节点存在而且是红色的){
+			调整父节点和伯父节点的颜色为黑色。
+			调整祖父节点的颜色为红色。
+			继续向上调整。
+		}
+		else{//伯父节点不存在或者是黑色的
+			if(插入节点是父节点的右孩子){
+				以父节点为旋转节点左旋。
+			}
+			
+			调整父节点颜色为黑色。
+			调整祖父节点的颜色为红色。
+
+			以祖父节点为旋转点右转。
+		}
+	}
+	else{//父节点是祖父节点的右孩子
+
+		if(伯父节点存在而且是红色的){
+			调整父节点和伯父节点的颜色为黑色。
+			调整祖父节点的颜色为红色。
+			继续向上调整。
+		}
+		else{//伯父节点不存在或者是黑色的
+			if(插入节点是父节点的左孩子){
+				以父节点为旋转节点右旋。
+			}
+			
+			调整父节点颜色为黑色。
+			调整祖父节点的颜色为红色。
+
+			以祖父节点为旋转点左转。
+		}
+	
+	}
+	让根节点为黑节点。//因为调整过程中可能会把根节点调整为红色，最后我们需要修正回来。
+}
+ */
+
+	void rb_tree_rebalance(base_ptr x, base_ptr& root){
+
+		x->color = red;
+		if(x->parent->parent->left = x->parent){
+			while(!(x == root || x->parent->color == black)){
+				y = x->parent->parent->right;
+				if(y && y->color == red){
+					x->parent->color = black;
+					y->color = black;
+					x->parent->parent->color = red;
+					x = x->parent->parent;
+				}
+				else{
+					if(x->parent->right == x){
+						x = x->parent;
+						rb_tree_rotate_left(x, root);
+					}
+
+					x->parent->color = black;
+					x->parent->parent->color = red;
+
+					rb_tree_rotate_right(x->parent->parent, root);
+				}
+			}
+		}
+		else{
+			while(!(x == root || x->parent->color == black)){
+				y = x->parent->parent->left;
+
+				if(y && y->color == red){
+					x->parent->color = balck;
+					y->color = black;
+					x->parent->parent->color = red;
+					x = x->parent->parent;
+				}
+				else{
+					if(x->parent->left == x){
+						x = x->parent;
+						rb_tree_rotate_right(x, root);
+					}
+
+					x->parent->color = black;
+					x->parent->parent->color = red;
+
+					rb_tree_rotate_left(x->parent->parent, root);
+				}
+			}
+		}
+
+		root->color = black;
+	}
+
+	iterator _insert(base_ptr x, base_ptr y, const Value& x);
 };
+
+
+/**
+ * 这里面特别需要注意一点函数的返回类型为什么不能直接写成iterator。规则是当在类外面定义函数的时候
+ * 函数的返回类型如果不是类模板的参数类型，则类型寻找是在类外寻找的，所以如果函数返回的是类中定义的
+ * 类型则返回值一定要用关键字typename，然而函数的参数缺没有这样的限制，因为函数参数作用域是类作用域，
+ * 可以看到类中定义的类型。
+ */
+template<class Key, class Value, class KeyOfValue, class Comp, class Alloc = alloc>
+typename rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::iterator
+rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::_insert(base_ptr x, base_ptr y, const Value& x){
+	
+	link_type new_node = create_node(x);
+	if(y == header){
+		root() = new_node;
+		leftmost() = new_node;
+		rightmost() = new_node;
+	}
+	else(!x || comp(KeyOfValue()(x), key(y))){
+		left(y) = new_node;
+		if(leftmost() == y)
+			leftmost() = x;
+	}
+	else{
+		right(y) = new_node;
+		if(rightmost() == y)
+			rightmost() = x;
+	}
+
+	parent(new_node) = y;
+	left(new_node) = 0;
+	right(new_node) = 0;
+
+	++node_coutn;
+	rb_tree_rebalance(new_node, header->parent);
+
+	return iteartor(new_node);
+}
+
+
 }//namespace my_tiny_stl
 
 #endif//__STL_TREE_H
