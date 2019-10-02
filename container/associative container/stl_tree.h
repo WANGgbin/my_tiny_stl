@@ -187,7 +187,7 @@ public:
 	typedef size_t size_type;
 	typedef rb_tree_iterator<Value>	iterator;
 	typedef rb_tree_base_node::base_ptr base_ptr;
-
+	typedef rb_tree<Key, Value, KeyOfValue, Comp, Alloc>	self;
 private:
 	size_type node_count;
 	Comp comp;
@@ -434,6 +434,51 @@ while(需要调整){
 	}
 
 	iterator _insert(base_ptr x, base_ptr y, const Value& x);
+	/**
+	 * [_erase 函数删除以x为根节点的树]
+	 * @param x [要删除树的根节点]
+	 */
+	void _erase(link_type x);
+
+	rb_tree_base_node*
+	_rb_tree_rebalance_for_erase(rb_tree_base_node* z,
+								 rb_tree_base_node*& root,
+								 rb_tree_base_node*& leftmost,
+								 rb_tree_base_node*& rightmost);
+public:
+
+	pair<iterator, bool> insert_unqiue(const Value& x); 
+	iterator insert_equal(const Value&  x);
+	iterator find(const Key& k);
+	void clear(){
+		_erase(root());
+		leftmost() = header;
+		rightmost() = header;
+		root() = 0;
+		node_count = 0;
+	}
+	void erase(iterator pos){
+		link_type y = (link_type)_rb_tree_rebalance_for_erase();
+		destroy_node(y);
+		--node_count;
+	}
+	/**
+	 * 还需要做的是红黑数的copy操作。
+	 */
+	rb_tree(const Comp& comp_par = Comp()) : node_count(0), comp(comp_par){init();}
+	rb_tree(const self& par){
+		//todo
+	}
+	self& operator=(const self& par){
+		//todo
+		return *this;
+	}
+
+	~rb_tree(){clear();}
+	iterator lower_bound(const Key& x);
+	iterator upper_bound(const Key& x);
+	size_type count(const Key& x);
+
 };
 
 
@@ -474,6 +519,187 @@ rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::_insert(base_ptr x, base_ptr y, co
 	return iteartor(new_node);
 }
 
+template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
+pair<rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::iterator, bool>
+rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::insert_unqiue(const Value& x){
+	link_type parent = header;
+	link_type cur = root();
+	iterator tmp;
+
+	/**
+	 * 这部分循环的目的是寻找最终插入位置。
+	 */
+	while(cur){
+		parent = cur;
+		cur = comp(KeyOfValue()(x), key(cur)) ? left(cur) : right(cur); 
+	}
+
+	/**
+	 * 最终插入位置可以分两类讨论，一中是插入位置是其父节点的左孩子，另一种是插入位置的右孩子
+	 * 那么这两种有什么区别吗？
+	 *
+	 * （1）、如果二叉搜索树存在与该节点相等的非叶节点，那么待插入节点一定是被插入到该非叶节点右子树的最左侧的。
+	 * 因为从该非叶节点角度看，其右侧的节点都比它大，而插入的重复节点又是比他大的节点中最小的，所以该插入节点
+	 * 的最终插入位置一定是在该非叶节点的右子树的最左侧。
+	 * （2）、如果该插入节点与某个叶节点重复，则一定是位于叶节点的右侧的。
+	 * 
+	 * 所以，我们可以先判断插入节点的插入位置，如果是其父节点的右孩子，则只需判断与父节点是否相同既可以判断是否重复。
+	 * 如果插入节点的最终位置是在左侧则需要判断插入节点的值是否与其父节点前驱节点(插入之前)的值是否相同。
+	 */
+	tmp = iterator(parent);
+	if(comp(KeyOfValue()(x), key(parent))){
+		/**
+		 * 一定不要忘记这里的分类讨论。如果小于，说明是其父节点的左孩子，因为如果tmp是begin，则其没有前驱。
+		 */
+		if(tmp == begin())
+			return pair<iterator, bool>(_insert(cur, parent, x), true);
+		--tmp;
+	}
+
+	if(comp(key(tmp.node), KeyOfValue()(x)))
+		return pair<iterator, bool>(_insert(cur, parent, x), true);
+
+	return pair<iterator, bool>(tmp, false);
+}
+
+template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
+rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::iterator
+rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::insert_equal(const Value& x){
+	link_type parent = header;
+	link_type cur = root();
+
+	while(cur){
+		parent = cur;
+		cur = comp(key(cur), KeyOfValue()(x)) ? right(cur) : left(cur);
+	}
+
+	return _insert(cur, parent, x);
+}
+
+/**
+ * 思路：寻找k的后继，如果后继为end()或者后继与k不相等则函数返回end()。
+ */
+template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
+rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::iterator
+rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::find(const Key& k){
+	link_type after = header;
+	link_type cur = root();
+
+	/**
+	 * 这是查找后继的典型操作。同样我们也可以查找前驱。
+	 */
+	while(cur){
+		if(!comp(key(cur), k)){
+			after = cur;
+			cur = left(cur);
+		}
+		else
+			cur = right(cur);
+	}
+
+	/**
+	 * while(cur){
+	 * 		if(comp(key(cur), k)){
+	 * 			before = cur;
+	 * 			cur = right(cur);
+	 * 		}
+	 * 		else
+	 * 			cur = left(cur);
+	 * }
+	 *
+	 * iterator j = iterator(before);
+	 * j有可能等于end()也可能为前驱。
+	 */
+	iterator j = iterator(after);
+
+	return (after == end() || comp(k, key(j.node))) ? end() : j;
+}
+
+/**
+ * 函数的实现中使用了递归，删除以x为根节点的子树，只有clear中调用这个函数。
+ */
+template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
+void rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::_erase(link_type x){
+	while(x){
+		_erase(right(x));
+		link_type left = left(x);
+		destroy_node(x);
+		x = left;
+	}
+}
+
+/**
+ * 这部分内容是整个rb-tree中最复杂的部分，删除某个节点，难点在于删除后的调整。
+ */
+template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
+rb_tree_base_node*
+rb_tree<Key, Value, KeyOfValue, Comp, Alloc::
+_rb_tree_rebalance_for_erase(rb_tree_base_node* z,
+							 rb_tree_base_node*& root,
+							 rb_tree_base_node*& leftmost,
+							 rb_tree_base_node*& rightmost){
+	//todo
+}
+
+
+/**
+ * 这个函数的作用是返回指向第一个大于等于(不小于)k的节点的迭代器
+ */
+template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
+rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::iterator
+void rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::lower_bound(const Key& k){
+	link_type after = header;
+	link_type cur = root();
+	iterator j;
+	while(cur){
+		if(!(comp(key(cur), k))){
+			j = iterator(cur);
+			cur = left(cur);
+		}
+		else
+			cur = right(cur);
+	}
+
+	return j;
+}
+
+/**
+ * 这个函数的作用是返回指向第一个大于k的节点的迭代器，从描述上来看lower_bound与upper_bound
+ * 似乎很相似，但实际上差很多。
+ */
+template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
+rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::iterator
+void rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::upper_bound(const Key& k){
+	link_type after = header;
+	link_type cur = root();
+	iterator j;
+	while(cur){
+		if((comp(k, key(cur)))){
+			j = iterator(cur);
+			cur = left(cur);
+		}
+		else
+			cur = right(cur);
+	}
+
+	return j;
+}
+
+/**
+ * 红黑树计算k的个数的思路是，先通过lower_bound计算第一个不小于k的节点的迭代器，
+ * 然后通过upper_bound计算第一个大于k的节点的迭代器，然后通过distance来计算这
+ * 两个迭代器之间的举例。一定要注意lower_bound与upper_bound之间的区别。
+ */
+template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
+rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::size_type
+void rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::count(const Key& k){
+	iterator first = lower_bound(k);
+	iterator last = upper_bound(k);
+	size_type ret;
+
+	ret = distance(first, last);
+	return ret;
+}
 
 }//namespace my_tiny_stl
 
