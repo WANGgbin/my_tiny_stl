@@ -106,6 +106,8 @@ public:
 	typedef hashtable_node<Value> node;
 	typedef size_t 	size_type;
 	typedef simple_alloc<node>	node_allocator;
+	typedef Value value_type;
+	typedef Value& reference;
 private:
 	HashFunc hash;
 	EqualKey equal;
@@ -115,6 +117,11 @@ private:
 	size_type num_elements;
 
 private:
+	void init_bunckets(size_type n){
+		bunckets.reserve(n);
+		bunckets.insert(bunckets.end(), n, (node*)0);
+	}
+
 	node* get_node(){
 		node* ret = node_allocator::allocate();
 		return ret;
@@ -136,8 +143,11 @@ private:
 	}
 	//调整哈希表的大小，注意调整规则。
 	void resize(unsigned long n);
+
 	pair<iterator, bool> insert_unqiue_noresize(const Value& x);
+	
 	iterator insert_equal_noresize(const Value& x);
+	
 	size_type bkt_key_num(Key k, size_type n){
 		return hash(k) % n;
 	}
@@ -152,6 +162,14 @@ private:
 
 	void copy_from(const hashtable& h);
 public:
+
+	hashtable(size_type n, const HashFunc& h, const EqualKey& e, const GetKey& g = GetKey()) : 
+	hash(h), equal(e), get_key(g), num_elements(0){init_bunckets();}
+
+	hashtable(const hashtable& h) : 
+	hash(h.hash), equal(h.equal), get_key(h.get_key), num_elements(0)
+	{copy_from(h);}
+
 	pair<iterator, bool> insert_unqiue(const Value& x){
 		resize(num_elements + 1);
 		return insert_unqiue_noresize(x);
@@ -162,6 +180,16 @@ public:
 		return insert_equal_noresize(x);
 	}
 
+	/**
+	 * 这个函数主要是为stl_hash_map提供的
+	 */
+	reference find_or_insert(const Value& obj);
+
+	pair<iterator, iterator> equal_range(const Key& k);
+	//该函数是将所有键值为k的节点删除。
+	size_type erase(const Key& k);
+	//删除节点pos
+	void erase(iterator pos);
 	void clear();
 
 	iterator find(const Value& x){
@@ -178,7 +206,7 @@ public:
 		size_type buncket = bkt_num(x);
 		node* first = bunckets[buncket];
 		size_type reuslt = 0;
-		
+
 		while(first){
 			if(equla(get_key(x), get_key(first->val)))
 				++result;
@@ -187,6 +215,19 @@ public:
 
 		return result;		
 	}
+	self& operator=(const self& par){
+		if(*this != par){
+			clear();
+			hash = par.hash;
+			get_key = par.get_key;
+			equal = par.equal;
+			copy_from(par);
+		}
+
+		return *this;
+	}
+	friend bool operator==<>(const hashtable& obj1, const hashtable& obj2);
+	~hashtable(){clear();}
 };
 
 template<class Value, class Key, class HashFunc,
@@ -261,6 +302,62 @@ hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::insert_equal_noresize(
 	return iterator(new_node, this);
 }
 
+template<class Value, class Key, class HashFunc,
+		 class GetKey, class EqualKey, class Alloc = alloc>
+typename hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::reference
+hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::find_or_insert(const Value& obj){
+	
+	resize(num_elements + 1);
+	size_type buncket = bkt_num(obj);
+	node* first = bunckets[buncket];
+
+	for(; first && !equal(get_key(first->val), get_key(obj)); first = first->next)
+		;
+
+	if(first)
+		return first->val;
+
+	node* tmp = create_node(obj);
+	tmp->next = bunckets[buncket];
+	bunckets[buncket] = tmp;
+	++num_elements;
+
+	return tmp->val;
+}
+/**
+ * 这个函数返回键值与k相等的节点范围迭代器[first, last)
+ */
+template<class Value, class Key, class HashFunc,
+		 class GetKey, class EqualKey, class Alloc = alloc>
+pair<typename hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::iterator,
+	 typename hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::iterator>
+hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::equal_range(const Key& k){
+	size_type buncket = bkt_num(k);
+	node* first = bunckets[buncket];
+
+	for(; first; first = first->next){
+		//找到第一个位置
+		if(equal(get_key(first->val), k)){
+			//开始寻找最后一个位置
+			for(node* last = first->next; last && equal(get_key(last->val), k); last = last->next)
+				;
+			//最后一个位置为last
+			if(last)
+				return pair<iterator(first, this), iterator(last, this)>;
+			//first之后本列表中所有元素键值都为k，则寻找下一个iterator
+			for(++buncket; buncket < bunckets.size() && !bunckets[buncket]; ++buncket)
+				;
+			//后面一个元素都没有
+			if(buncket == bunckets.size())
+				return pair<iterator(first, this), end()>;
+			//有元素
+			return pair<iterator(first, this), iterator(bunckets[buncket], this)>;
+		}
+	}
+	//未找到
+	return pair<end(), end()>;
+}
+
 /**
  * 注意这里的clear函数只是释放了所有节点，并没有释放bunckets，这一点一定要注意。
  */
@@ -319,6 +416,111 @@ void hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::copy_from(const h
 	}
 }
 
+template<class Value, class Key, class HashFunc,
+		 class GetKey, class EqualKey, class Alloc = alloc>
+bool operator==(const hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>& obj1,
+				const hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>& obj2){
+
+	/**
+	 * 注意这里特别容易出错的地方是，对于友元函数，因为其不算是类作用域，所以如果想要使用类内部
+	 * 定义的类型、符号或者其他，不能直接使用。
+	 */
+	
+	typedef typename hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::node node;
+	typedef typename hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::size_type size_type;
+		
+	size_type size_1 = obj1.bunckets.size();
+	size_Type size_2 = obj2.bunckets.size();
+	if(size_1 != size_2)
+		return false; 
+
+	for(size_type i = 0; i < size_1; ++i){
+		node* cur_1 = obj1.bunckets[i];
+		node* cur_2 = obj2.bunckets[i];
+		for(;cur_1 && cur_2 && cur_1->val == cur_2->val; cur_1 = cur_1->next, cur_2 = cur_2->next)
+			;
+
+		if(cur_1 || cur_2)
+			return false;
+	}
+
+	return true;
+}
+
+/**
+ * 这个函数删除所有键值为k的节点。注意这里的实现技巧，因为第一个节点的删除与其他节点的删除操作是不一样的，
+ * 所以本函数实现首先从第二个节点开始判断，当遍历完列表之后，再判断第一个节点。
+ */
+template<class Value, class Key, class HashFunc,
+		 class GetKey, class EqualKey, class Alloc = alloc>
+typename hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::size_type
+hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::erase(const Key& k){
+	size_type buncket = bkt_key_num(k);
+	node* first = bunckets[buncket];
+	node* cur;
+	size_type ret = 0;
+
+	if(first){
+		node* next = first->next;
+
+		while(next){
+			if(equal(get_key(next->val), k)){
+				first->next = next->next;
+				destroy_node(next);
+				next = first->next;
+				--num_elements;
+				++ret;
+			}
+			else{
+				first = next;
+				next = first->next;
+			}
+		}
+
+		first = bunckets[buncket];
+		if(equal(get_key(first->val), k)){
+			bunckets[buncket] = first->next;
+			destroy_node(first);
+			--num_elements;
+			++ret;
+		}
+	}
+
+	return ret;	
+}
+/**
+ * 注意这个函数只是删除pos指向的节点，而不是删除所有与pos键值相等的节点
+ */
+template<class Value, class Key, class HashFunc,
+		 class GetKey, class EqualKey, class Alloc = alloc>
+// typename hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::size_type
+void hashtable<Value, Key, HashFunc, GetKey, EqualKey, Alloc>::erase(iterator pos){
+	node* cur = pos.node_ptr;
+
+	if(cur){
+		size_type buncket = bkt_num(cur->val);
+		node* first = bunckets[buncket];
+
+		if(first == cur){
+			bunckets[buncket] = first->next;
+			destroy_node(first);
+			--num_elements;
+			return;
+		}
+
+		node* next = first->next;
+		while(next){
+			if(next == cur){
+				first->next = next->next;
+				destroy_node(next);
+				--num_elements;
+				return;
+			}
+			first = next;
+			next = first->next;
+		}
+	}
+}
 
 }//namespace my_tiny_stl
 

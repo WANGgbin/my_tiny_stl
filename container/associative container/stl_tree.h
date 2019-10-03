@@ -10,11 +10,14 @@ const color_typpe black = false;
 
 template<class T1, class T2>
 struct pair{
-	T1 first;
-	T2 second;
+	typedef T1 first_type;
+	typedef T2 second_type;
+
+	first_type first;
+	second_type second;
 
 	pair(){}
-	pair(const T1& obj1, const T2& obj2) : first(obj1), second(obj2){}
+	pair(const first_type& obj1, const second_type& obj2) : first(obj1), second(obj2){}
 };
 
 /**
