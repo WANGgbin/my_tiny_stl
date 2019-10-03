@@ -646,7 +646,8 @@ _rb_tree_rebalance_for_erase(rb_tree_base_node* z,
 
 
 /**
- * 这个函数的作用是返回指向第一个大于等于(不小于)k的节点的迭代器
+ * 这个函数的作用是返回指向第一个大于等于(不小于)k的节点的迭代器.
+ * lower_bound与函数find两者的实现一模一样。
  */
 template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
 rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::iterator
