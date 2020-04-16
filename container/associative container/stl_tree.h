@@ -521,7 +521,13 @@ rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::_insert(base_ptr x, base_ptr y, co
 
 	return iteartor(new_node);
 }
-
+/*红黑树的插入、查找、计数操作，如果我们从有序序列的角度出发，则是比较容易理解的。这里独立插入的实现，我们从有序序列角度考虑，可能也会比较容易理解，
+*先思考一个问题为什么在寻找的过程中不直接判断k与当前节点的k是不是相等呢，如果相等不是就直接返回了吗？原因是我们只知道comp，这是用来判断大小关系的，
+却通常无法用来判断相等关系。STL中的实现是，先找最后插入位置的父节点，然后判断是在父节点左侧还是父节点右侧，如果是在父节点左侧，则只需要判断父节点
+插入前的前驱节点的值是否与插入值相等，如果在父节点右侧，则只需判断插入值是否与父节点值相等。前面我们说通常我们无法通过comp来判断两个k是否相等，那么
+什么情况下可以判断呢？距离：比如判断两个节点a, b,b是a的后继，那么此时b必定大于等于a，如果comp(a, b)成立，表示a小于b，即b大于a，如果这个条件不成立则
+b必定等于a，也就是说我们给comp加一个额外的条件，就可以判断是否相等。
+*/
 template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
 pair<rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::iterator, bool>
 rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::insert_unqiue(const Value& x){
@@ -580,7 +586,14 @@ rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::insert_equal(const Value& x){
 }
 
 /**
- * 思路：寻找k的后继，如果后继为end()或者后继与k不相等则函数返回end()。
+ * 思路：寻找k的后继，如果后继为end()或者后继与k不相等则函数返回end()。我们可以思考一个问题，如果让我们设计一红黑树的查找操作，我们会简单的认为，拿k跟
+ 当前节点的k比较，如果小于往左边走，如果大于往右边走，如果相等，则返回。为什么STL中的实现是这样呢，这么实现会不会多此一举呢？实际上，在整个红黑树中
+ 我们只知道comp来比较k的大小关系，我们无法通过comp来判断两个k是不是相等，如果k是简单的类型比如int，这样很容易判断，但如果是别的复杂的类型，这里的comp
+ 只是大于或者小于，我们是无法判断两个k是不是相等的，所以我们需要考虑别的设计思路。STL中的思路是我找当前要插入节点的后继节点，如果后继节点存在且key值等于
+ k，则表示能够找到该节点，反之则表示找不到。一个问题：刚才不是讨论说，两个k值不能比较吗？这里为啥又能比较了？这里因为是跟自己的后继比较，所以其值一定是
+ 小于等于后继的值的，所以如果comp(k, key(j.node))不成立的话，则必定相等。现在来考虑是如何找后继节点的呢？后继节点实际上就是第一个大于等于k的节点，因为
+ 我们知道红黑树中序遍历是一个有序序列，我们从有序序列的角度去理解可能更容易一些，当当前节点的值大于等于k的时候，我们将当前节点存下来，后面不断重复这样的
+ 操作，这样最后存下来的after就是要插入节点的后继。
  */
 template<class Key, class Value, class KeyOfValue, class Comp, class Alloc>
 rb_tree<Key, Value, KeyOfValue, Comp, Alloc>::iterator
